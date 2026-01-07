@@ -43,15 +43,27 @@ def load_settings():
                         settings[int(k)] = [v]
                     else:
                         settings[int(k)] = v
-                return settings
+                
+                # Load server-wide settings
+                server_settings = {}
+                for k, v in data.get('auto_translate_servers', {}).items():
+                    if isinstance(v, str):
+                        server_settings[int(k)] = [v]
+                    else:
+                        server_settings[int(k)] = v
+                
+                return settings, server_settings
     except Exception as e:
         print(f"Error loading settings: {e}")
-    return {}
+    return {}, {}
 
-def save_settings(auto_translate_channels):
+def save_settings(auto_translate_channels, auto_translate_servers):
     """Save auto-translate settings to file"""
     try:
-        data = {'auto_translate_channels': auto_translate_channels}
+        data = {
+            'auto_translate_channels': auto_translate_channels,
+            'auto_translate_servers': auto_translate_servers
+        }
         with open(SETTINGS_FILE, 'w') as f:
             json.dump(data, f, indent=2)
     except Exception as e:
@@ -153,11 +165,15 @@ async def on_ready():
     print(f'Invite URL: https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=274878286848&scope=bot%20applications.commands')
     
     # Load persistent settings
-    bot.auto_translate_channels = load_settings()
+    bot.auto_translate_channels, bot.auto_translate_servers = load_settings()
     if bot.auto_translate_channels:
         print(f"📋 Loaded {len(bot.auto_translate_channels)} auto-translate channel(s)")
         for channel_id, lang in bot.auto_translate_channels.items():
             print(f"  - Channel {channel_id} → {lang}")
+    if bot.auto_translate_servers:
+        print(f"🌍 Loaded {len(bot.auto_translate_servers)} server-wide auto-translate(s)")
+        for guild_id, lang in bot.auto_translate_servers.items():
+            print(f"  - Server {guild_id} → {lang}")
     
     try:
         synced = await bot.tree.sync()
@@ -328,7 +344,7 @@ async def autotranslate(interaction: discord.Interaction, languages: str, enable
             return
         
         bot.auto_translate_channels[channel_id] = target_codes
-        save_settings(bot.auto_translate_channels)
+        save_settings(bot.auto_translate_channels, bot.auto_translate_servers)
         
         lang_display = ", ".join([f"**{code}**" for code in target_codes])
         await interaction.response.send_message(
@@ -338,8 +354,55 @@ async def autotranslate(interaction: discord.Interaction, languages: str, enable
     else:
         if channel_id in bot.auto_translate_channels:
             del bot.auto_translate_channels[channel_id]
-            save_settings(bot.auto_translate_channels)
+            save_settings(bot.auto_translate_channels, bot.auto_translate_servers)
         await interaction.response.send_message(f"✅ Auto-translation disabled for this channel")
+
+@bot.tree.command(name="autotranslateserver", description="Enable auto-translate for entire server (Admin only)")
+@app_commands.describe(
+    languages="Comma-separated languages for auto-translation (e.g., 'english, spanish, french')",
+    enable="Enable or disable server-wide auto-translation (true/false)"
+)
+@app_commands.default_permissions(administrator=True)
+@app_commands.autocomplete(languages=language_autocomplete)
+async def autotranslateserver(interaction: discord.Interaction, languages: str, enable: bool):
+    """Enable/disable automatic translation for all channels in the server (Admin only)"""
+    guild_id = interaction.guild_id
+    
+    if not guild_id:
+        await interaction.response.send_message("❌ This command can only be used in a server")
+        return
+    
+    if enable:
+        # Parse target languages
+        target_langs = [lang.strip() for lang in languages.split(',')]
+        target_codes = []
+        
+        for lang in target_langs:
+            code = get_language_code(lang)
+            if code:
+                target_codes.append(code)
+            else:
+                await interaction.response.send_message(f"❌ Invalid language: `{lang}`")
+                return
+        
+        if not target_codes:
+            await interaction.response.send_message("❌ No valid target languages specified")
+            return
+        
+        bot.auto_translate_servers[guild_id] = target_codes
+        save_settings(bot.auto_translate_channels, bot.auto_translate_servers)
+        
+        lang_display = ", ".join([f"**{code}**" for code in target_codes])
+        await interaction.response.send_message(
+            f"✅ Server-wide auto-translation enabled\n"
+            f"🌐 Target languages: {lang_display}\n"
+            f"ℹ️ This will translate messages in ALL channels (except channel-specific overrides)"
+        )
+    else:
+        if guild_id in bot.auto_translate_servers:
+            del bot.auto_translate_servers[guild_id]
+            save_settings(bot.auto_translate_channels, bot.auto_translate_servers)
+        await interaction.response.send_message(f"✅ Server-wide auto-translation disabled")
 
 @bot.tree.command(name="addlanguage", description="Add a language to auto-translate in this channel")
 @app_commands.describe(language="Language to add (e.g., 'spanish', 'es')")
@@ -370,7 +433,7 @@ async def addlanguage(interaction: discord.Interaction, language: str):
     
     # Add the language
     current_langs.append(lang_code)
-    save_settings(bot.auto_translate_channels)
+    save_settings(bot.auto_translate_channels, bot.auto_translate_servers)
     
     lang_display = ", ".join([f"**{code}**" for code in current_langs])
     await interaction.response.send_message(
@@ -410,14 +473,14 @@ async def removelanguage(interaction: discord.Interaction, language: str):
     # If no languages left, disable auto-translate
     if not current_langs:
         del bot.auto_translate_channels[channel_id]
-        save_settings(bot.auto_translate_channels)
+        save_settings(bot.auto_translate_channels, bot.auto_translate_servers)
         await interaction.response.send_message(
             f"✅ Removed **{lang_code}** from auto-translate\n"
             f"⚠️ No languages remaining - auto-translate has been disabled"
         )
         return
     
-    save_settings(bot.auto_translate_channels)
+    save_settings(bot.auto_translate_channels, bot.auto_translate_servers)
     
     lang_display = ", ".join([f"**{code}**" for code in current_langs])
     await interaction.response.send_message(
@@ -456,6 +519,9 @@ async def languages(interaction: discord.Interaction):
 # Auto-translate channels storage (will be loaded from file on startup)
 bot.auto_translate_channels = {}
 
+# Server-wide auto-translate storage (guild_id -> [language codes])
+bot.auto_translate_servers = {}
+
 # Store mapping of original message ID to translation message ID
 bot.translation_messages = {}
 
@@ -477,8 +543,15 @@ async def on_message(message):
         return
     
     # Check if channel has auto-translation enabled
+    target_langs = None
+    
+    # Priority: Channel-specific settings > Server-wide settings
     if message.channel.id in bot.auto_translate_channels:
         target_langs = bot.auto_translate_channels[message.channel.id]
+    elif message.guild and message.guild.id in bot.auto_translate_servers:
+        target_langs = bot.auto_translate_servers[message.guild.id]
+    
+    if target_langs:
         
         # Ensure target_langs is a list (for backward compatibility)
         if isinstance(target_langs, str):
@@ -495,24 +568,36 @@ async def on_message(message):
             source_lang_name = next((name for name, code in LANGUAGE_NAMES.items() if code == source_lang), source_lang)
             
             # Build translations for all target languages that differ from source
-            translations = []
-            for target_lang in target_langs:
+            # Translate in parallel for faster performance
+            async def translate_to_language(target_lang):
+                """Helper function to translate to a single language"""
                 # Skip if target is same as source (handle both full codes and base codes)
                 if source_lang == target_lang or source_lang.split('-')[0] == target_lang.split('-')[0]:
-                    continue
+                    return None
                     
-                translator = GoogleTranslator(source='auto', target=target_lang)
-                translated = translator.translate(message.content)
-                
-                # Skip if translation is empty or just whitespace
-                if not translated or not translated.strip():
-                    print(f"⚠️ Empty translation for {target_lang}, skipping")
-                    continue
-                
-                # Find target language name
-                target_lang_name = next((name for name, code in LANGUAGE_NAMES.items() if code == target_lang), target_lang)
-                
-                translations.append((target_lang, target_lang_name, translated))
+                try:
+                    translator = GoogleTranslator(source='auto', target=target_lang)
+                    translated = translator.translate(message.content)
+                    
+                    # Skip if translation is empty or just whitespace
+                    if not translated or not translated.strip():
+                        print(f"⚠️ Empty translation for {target_lang}, skipping")
+                        return None
+                    
+                    # Find target language name
+                    target_lang_name = next((name for name, code in LANGUAGE_NAMES.items() if code == target_lang), target_lang)
+                    
+                    return (target_lang, target_lang_name, translated)
+                except Exception as e:
+                    print(f"❌ Error translating to {target_lang}: {e}")
+                    return None
+            
+            # Run all translations in parallel
+            translation_tasks = [translate_to_language(lang) for lang in target_langs]
+            results = await asyncio.gather(*translation_tasks)
+            
+            # Filter out None results
+            translations = [t for t in results if t is not None]
             
             # Only send if we have translations
             if translations:
