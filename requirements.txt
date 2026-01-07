@@ -1,0 +1,4 @@
+discord.py>=2.3.0
+python-dotenv>=1.0.0
+deep-translator>=1.11.0
+langdetect>=1.0.9
