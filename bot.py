@@ -341,6 +341,90 @@ async def autotranslate(interaction: discord.Interaction, languages: str, enable
             save_settings(bot.auto_translate_channels)
         await interaction.response.send_message(f"✅ Auto-translation disabled for this channel")
 
+@bot.tree.command(name="addlanguage", description="Add a language to auto-translate in this channel")
+@app_commands.describe(language="Language to add (e.g., 'spanish', 'es')")
+@app_commands.autocomplete(language=language_autocomplete)
+async def addlanguage(interaction: discord.Interaction, language: str):
+    """Add a language to existing auto-translate settings"""
+    channel_id = interaction.channel_id
+    
+    # Check if auto-translate is enabled for this channel
+    if channel_id not in bot.auto_translate_channels:
+        await interaction.response.send_message(
+            "❌ Auto-translate is not enabled in this channel.\n"
+            "Use `/autotranslate` to enable it first."
+        )
+        return
+    
+    # Get language code
+    lang_code = get_language_code(language)
+    if not lang_code:
+        await interaction.response.send_message(f"❌ Invalid language: `{language}`")
+        return
+    
+    # Check if language is already in the list
+    current_langs = bot.auto_translate_channels[channel_id]
+    if lang_code in current_langs:
+        await interaction.response.send_message(f"ℹ️ **{lang_code}** is already in the auto-translate list")
+        return
+    
+    # Add the language
+    current_langs.append(lang_code)
+    save_settings(bot.auto_translate_channels)
+    
+    lang_display = ", ".join([f"**{code}**" for code in current_langs])
+    await interaction.response.send_message(
+        f"✅ Added **{lang_code}** to auto-translate\n"
+        f"🌐 Current languages: {lang_display}"
+    )
+
+@bot.tree.command(name="removelanguage", description="Remove a language from auto-translate in this channel")
+@app_commands.describe(language="Language to remove (e.g., 'spanish', 'es')")
+@app_commands.autocomplete(language=language_autocomplete)
+async def removelanguage(interaction: discord.Interaction, language: str):
+    """Remove a language from existing auto-translate settings"""
+    channel_id = interaction.channel_id
+    
+    # Check if auto-translate is enabled for this channel
+    if channel_id not in bot.auto_translate_channels:
+        await interaction.response.send_message(
+            "❌ Auto-translate is not enabled in this channel."
+        )
+        return
+    
+    # Get language code
+    lang_code = get_language_code(language)
+    if not lang_code:
+        await interaction.response.send_message(f"❌ Invalid language: `{language}`")
+        return
+    
+    # Check if language is in the list
+    current_langs = bot.auto_translate_channels[channel_id]
+    if lang_code not in current_langs:
+        await interaction.response.send_message(f"ℹ️ **{lang_code}** is not in the auto-translate list")
+        return
+    
+    # Remove the language
+    current_langs.remove(lang_code)
+    
+    # If no languages left, disable auto-translate
+    if not current_langs:
+        del bot.auto_translate_channels[channel_id]
+        save_settings(bot.auto_translate_channels)
+        await interaction.response.send_message(
+            f"✅ Removed **{lang_code}** from auto-translate\n"
+            f"⚠️ No languages remaining - auto-translate has been disabled"
+        )
+        return
+    
+    save_settings(bot.auto_translate_channels)
+    
+    lang_display = ", ".join([f"**{code}**" for code in current_langs])
+    await interaction.response.send_message(
+        f"✅ Removed **{lang_code}** from auto-translate\n"
+        f"🌐 Current languages: {lang_display}"
+    )
+
 @bot.tree.command(name="detectlanguage", description="Detect the language of text")
 @app_commands.describe(text="The text to analyze")
 async def detectlanguage(interaction: discord.Interaction, text: str):
