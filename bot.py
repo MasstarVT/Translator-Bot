@@ -162,7 +162,13 @@ async def on_ready():
     print(f'{bot.user} has connected to Discord!')
     print(f'Bot is in {len(bot.guilds)} guilds')
     print(f'Bot ID: {bot.user.id}')
-    print(f'Invite URL: https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=274878286848&scope=bot%20applications.commands')
+    
+    # Generate invite URLs for both server and user installation
+    server_invite = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=274878286848&scope=bot%20applications.commands"
+    user_invite = f"https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&scope=applications.commands"
+    
+    print(f'Server Invite: {server_invite}')
+    print(f'User Install (DMs/Groups): {user_invite}')
     
     # Load persistent settings
     bot.auto_translate_channels, bot.auto_translate_servers = load_settings()
@@ -363,6 +369,7 @@ async def autotranslate(interaction: discord.Interaction, languages: str, enable
     enable="Enable or disable server-wide auto-translation (true/false)"
 )
 @app_commands.default_permissions(administrator=True)
+@app_commands.guild_only()
 @app_commands.autocomplete(languages=language_autocomplete)
 async def autotranslateserver(interaction: discord.Interaction, languages: str, enable: bool):
     """Enable/disable automatic translation for all channels in the server (Admin only)"""
@@ -513,6 +520,37 @@ async def languages(interaction: discord.Interaction):
     
     embed = discord.Embed(title="🌍 Supported Languages", description=lang_list, color=discord.Color.gold())
     embed.set_footer(text="Use language names or codes in commands")
+    
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="invite", description="Get bot invite links")
+async def invite_command(interaction: discord.Interaction):
+    """Display bot invite links for servers and user installation"""
+    bot_id = bot.user.id
+    server_invite = f"https://discord.com/api/oauth2/authorize?client_id={bot_id}&permissions=274878286848&scope=bot%20applications.commands"
+    user_invite = f"https://discord.com/api/oauth2/authorize?client_id={bot_id}&scope=applications.commands"
+    
+    embed = discord.Embed(
+        title="🌐 Invite Translation Bot",
+        description="Choose how you want to add the bot:",
+        color=discord.Color.blue()
+    )
+    
+    embed.add_field(
+        name="🏰 Add to Server",
+        value=f"[Click here]({server_invite}) to add to a Discord server\n"
+              f"*Requires admin permissions*",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="👤 Install for Personal Use",
+        value=f"[Click here]({user_invite}) to use in DMs and group chats\n"
+              f"*Works in direct messages and groups!*",
+        inline=False
+    )
+    
+    embed.set_footer(text="User install allows translation in DMs without adding to servers")
     
     await interaction.response.send_message(embed=embed)
 

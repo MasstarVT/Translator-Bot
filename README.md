@@ -100,7 +100,7 @@ Synced 5 slash commands
 
 ## 🌍 Supported Languages
 
-The bot supports 30+ languages including:
+The bot supports 30+ languages includiSng:
 
 - **European**: English, Spanish, French, German, Italian, Portuguese, Russian, Dutch, Polish, Turkish, Swedish, Norwegian, Danish, Finnish, Greek, Czech, Romanian, Hungarian, Ukrainian
 - **Asian**: Japanese, Korean, Chinese, Hindi, Thai, Vietnamese, Indonesian, Malay, Filipino, Bengali, Tamil, Hebrew
