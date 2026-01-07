@@ -4,6 +4,9 @@
 # Bot settings
 bot_settings.json
 
+# Docker
+docker-compose.override.yml
+
 # Python
 __pycache__/
 *.py[cod]

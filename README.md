@@ -38,6 +38,51 @@ A powerful Discord bot that translates messages between multiple languages with 
 
 ## 🚀 Setup Instructions
 
+### Option 1: Docker (Recommended)
+
+**Prerequisites:**
+- Docker and Docker Compose installed
+- Discord bot token
+
+**Quick Start:**
+
+1. Clone the repository and navigate to the directory
+2. Copy `.env.example` to `.env` and add your bot token:
+   ```bash
+   cp .env.example .env
+   # Edit .env and add: DISCORD_BOT_TOKEN=your_bot_token_here
+   ```
+
+3. Run the automated setup script:
+   ```bash
+   ./docker-start.sh
+   ```
+
+**Manual Docker Commands:**
+
+```bash
+# Build the Docker image
+docker-compose build
+
+# Start the bot
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the bot
+docker-compose down
+
+# Restart the bot
+docker-compose restart
+```
+
+**Persistent Data:**
+- Bot settings (auto-translate configurations) are stored in `bot_settings.json`
+- This file is automatically mounted as a volume and persists between container restarts
+
+### Option 2: Traditional Installation
+
 ### 1. Create a Discord Bot
 
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
