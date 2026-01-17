@@ -613,7 +613,7 @@ async def on_message(message):
             source_lang_name = next((name for name, code in LANGUAGE_NAMES.items() if code == source_lang), source_lang)
             
             # Build translations for all target languages that differ from source
-            # Translate in parallel for faster performance
+            # Translate in parallel using threads for faster performance
             async def translate_to_language(target_lang):
                 """Helper function to translate to a single language"""
                 # Skip if target is same as source (handle both full codes and base codes)
@@ -626,8 +626,13 @@ async def on_message(message):
                     
                 try:
                     print(f"🔄 Translating to {target_lang}...")
-                    translator = GoogleTranslator(source=source_lang, target=target_lang)
-                    translated = translator.translate(message.content)
+                    
+                    # Run the synchronous translation in a thread to avoid blocking
+                    def _translate():
+                        translator = GoogleTranslator(source=source_lang, target=target_lang)
+                        return translator.translate(message.content)
+                    
+                    translated = await asyncio.to_thread(_translate)
                     
                     print(f"✅ Translation to {target_lang}: {translated[:100]}")
                     
@@ -644,7 +649,7 @@ async def on_message(message):
                     print(f"❌ Error translating to {target_lang}: {e}")
                     return None
             
-            # Run all translations in parallel
+            # Run all translations in parallel using asyncio.gather with threading
             translation_tasks = [translate_to_language(lang) for lang in target_langs]
             results = await asyncio.gather(*translation_tasks)
             
