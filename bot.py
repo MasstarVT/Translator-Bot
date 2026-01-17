@@ -137,10 +137,17 @@ def detect_language(text):
         # Clean text for detection (remove emojis)
         cleaned_text = clean_text_for_detection(text)
         
-        # If cleaned text is too short or empty, default to English
-        if len(cleaned_text) < 3:
-            print(f"⚠️ Text too short for detection: '{text[:50]}' - defaulting to 'en'")
-            return 'en'
+        # Pre-check for Chinese characters to improve accuracy
+        # Chinese character ranges: CJK Unified Ideographs
+        chinese_pattern = re.compile(r'[\u4e00-\u9fff]')
+        chinese_matches = chinese_pattern.findall(cleaned_text)
+        if chinese_matches:
+            # Check if text contains mostly Chinese characters
+            chinese_char_count = len(chinese_matches)
+            total_chars = len(re.findall(r'\S', cleaned_text))
+            if total_chars > 0 and chinese_char_count / total_chars > 0.3:  # If >30% Chinese characters
+                print(f"🔍 Detected {chinese_char_count}/{total_chars} Chinese characters, forcing zh-CN for text: {cleaned_text[:50]}")
+                return 'zh-CN'
         
         detected = detect(cleaned_text)
         print(f"🔍 Detected language: {detected} for text: {cleaned_text[:50]}")
@@ -610,12 +617,19 @@ async def on_message(message):
             async def translate_to_language(target_lang):
                 """Helper function to translate to a single language"""
                 # Skip if target is same as source (handle both full codes and base codes)
-                if source_lang == target_lang or source_lang.split('-')[0] == target_lang.split('-')[0]:
+                source_base = source_lang.split('-')[0].lower()
+                target_base = target_lang.split('-')[0].lower()
+                
+                if source_lang.lower() == target_lang.lower() or source_base == target_base:
+                    print(f"⏭️ Skipping {target_lang} (same as source {source_lang})")
                     return None
                     
                 try:
-                    translator = GoogleTranslator(source='auto', target=target_lang)
+                    print(f"🔄 Translating to {target_lang}...")
+                    translator = GoogleTranslator(source=source_lang, target=target_lang)
                     translated = translator.translate(message.content)
+                    
+                    print(f"✅ Translation to {target_lang}: {translated[:100]}")
                     
                     # Skip if translation is empty or just whitespace
                     if not translated or not translated.strip():
