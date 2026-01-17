@@ -3,7 +3,7 @@ version: '3.8'
 services:
   translator-bot:
     build: .
-    container_name: discord-translator-bot
+    container_name: MasstarVT/Translator-Bot
     restart: unless-stopped
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
