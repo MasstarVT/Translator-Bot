@@ -426,7 +426,7 @@ int main() {
             std::vector<dpp::slashcommand> commands = {
                 dpp::slashcommand("translate", "Translate text to a target language", bot.me.id)
                     .add_option(dpp::command_option(dpp::co_string, "text", "The text to translate", true))
-                    .add_option(dpp::command_option(dpp::co_string, "target_language", "Target language", true)),
+                    .add_option(dpp::command_option(dpp::co_string, "target_language", "Target language", true).set_auto_complete(true)),
 
                 dpp::slashcommand("detectlanguage", "Detect the language of text", bot.me.id)
                     .add_option(dpp::command_option(dpp::co_string, "text", "The text to analyze", true)),
@@ -434,24 +434,109 @@ int main() {
                 dpp::slashcommand("languages", "List all supported languages", bot.me.id),
 
                 dpp::slashcommand("autotranslate", "Enable/disable auto-translation for this channel", bot.me.id)
-                    .add_option(dpp::command_option(dpp::co_string, "languages", "Target languages (comma-separated)", true))
+                    .add_option(dpp::command_option(dpp::co_string, "languages", "Target languages (comma-separated)", true).set_auto_complete(true))
                     .add_option(dpp::command_option(dpp::co_boolean, "enable", "Enable or disable", true))
                     .set_default_permissions(dpp::p_manage_guild),
 
                 dpp::slashcommand("autotranslateserver", "Enable/disable auto-translation for all channels", bot.me.id)
-                    .add_option(dpp::command_option(dpp::co_string, "languages", "Target languages (comma-separated)", true))
+                    .add_option(dpp::command_option(dpp::co_string, "languages", "Target languages (comma-separated)", true).set_auto_complete(true))
                     .add_option(dpp::command_option(dpp::co_boolean, "enable", "Enable or disable", true))
                     .set_default_permissions(dpp::p_manage_guild),
 
                 dpp::slashcommand("addlanguage", "Add a language to auto-translation", bot.me.id)
-                    .add_option(dpp::command_option(dpp::co_string, "language", "Language to add", true)),
+                    .add_option(dpp::command_option(dpp::co_string, "language", "Language to add", true).set_auto_complete(true)),
 
                 dpp::slashcommand("addlanguageserver", "Add a language to the server's auto-translation", bot.me.id)
-                    .add_option(dpp::command_option(dpp::co_string, "language", "Language to add", true))
+                    .add_option(dpp::command_option(dpp::co_string, "language", "Language to add", true).set_auto_complete(true))
             };
 
             bot.global_bulk_command_create(commands);
             std::cout << "Slash commands registered!" << std::endl;
+        }
+    });
+
+    // Handle autocomplete for language options
+    bot.on_autocomplete([&bot](const dpp::autocomplete_t& event) {
+        // Find the focused option
+        for (const auto& opt : event.options) {
+            if (opt.focused) {
+                std::string focused_option = opt.name;
+
+                // Check if this is a language-related option
+                if (focused_option == "target_language" || focused_option == "language" || focused_option == "languages") {
+                    std::string user_input;
+                    if (std::holds_alternative<std::string>(opt.value)) {
+                        user_input = std::get<std::string>(opt.value);
+                    }
+
+                    // For multi-language fields, handle comma-separated input
+                    std::string prefix;
+                    std::string current_input = user_input;
+                    bool is_multi = (focused_option == "languages");
+
+                    if (is_multi) {
+                        // Find the last comma and split
+                        size_t last_comma = user_input.rfind(',');
+                        if (last_comma != std::string::npos) {
+                            prefix = user_input.substr(0, last_comma + 1) + " ";
+                            current_input = user_input.substr(last_comma + 1);
+                            // Trim leading whitespace from current input
+                            size_t start = current_input.find_first_not_of(" \t");
+                            if (start != std::string::npos) {
+                                current_input = current_input.substr(start);
+                            } else {
+                                current_input = "";
+                            }
+                        }
+                    }
+
+                    // Convert input to lowercase for matching
+                    std::string lower_input = current_input;
+                    std::transform(lower_input.begin(), lower_input.end(), lower_input.begin(), ::tolower);
+
+                    dpp::interaction_response response(dpp::ir_autocomplete_reply);
+
+                    // Add matching languages (max 25 choices)
+                    int count = 0;
+                    for (const auto& [name, code] : LANGUAGE_NAMES) {
+                        if (count >= 24) break;  // Leave room for both name and code options
+
+                        // Match if input is empty or name/code contains input
+                        if (lower_input.empty() || name.find(lower_input) != std::string::npos || code.find(lower_input) != std::string::npos) {
+                            // Capitalize first letter for display
+                            std::string display_name = name;
+                            display_name[0] = std::toupper(display_name[0]);
+
+                            // Add full name option
+                            std::string choice_value = prefix + name;
+                            std::string choice_display;
+                            if (is_multi && !prefix.empty()) {
+                                choice_display = prefix + display_name;
+                            } else {
+                                choice_display = display_name + " (" + code + ")";
+                            }
+                            response.add_autocomplete_choice(dpp::command_option_choice(choice_display, choice_value));
+                            count++;
+
+                            // Add short code option if user is typing short form
+                            if (!lower_input.empty() && code.find(lower_input) == 0 && count < 25) {
+                                std::string code_value = prefix + code;
+                                std::string code_display;
+                                if (is_multi && !prefix.empty()) {
+                                    code_display = prefix + code;
+                                } else {
+                                    code_display = code + " (" + display_name + ")";
+                                }
+                                response.add_autocomplete_choice(dpp::command_option_choice(code_display, code_value));
+                                count++;
+                            }
+                        }
+                    }
+
+                    bot.interaction_response_create(event.command.id, event.command.token, response);
+                }
+                break;
+            }
         }
     });
 
