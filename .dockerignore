@@ -1,3 +1,6 @@
+# Build artifacts
+build/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -26,5 +29,14 @@ Thumbs.db
 README.md
 *.md
 
-# Bot settings (will be mounted as volume)
+# Bot settings and secrets (will be mounted as volume or passed as env vars)
 bot_settings.json
+.env
+.env.*
+!.env.example
+
+# Data directory (mounted as volume at runtime)
+data/
+
+# Old files
+Dockerfile.cpp

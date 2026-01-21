@@ -1,0 +1,17 @@
+services:
+  discord-bot:
+    build: .
+    container_name: discord-bot
+    restart: unless-stopped
+    # Override user if your UID is not 1000: user: "YOUR_UID:YOUR_GID"
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./data:/app/data
+    environment:
+      - DATABASE_PATH=/app/data/bot.db
+    # Security: drop all capabilities, read-only root filesystem
+    security_opt:
+      - no-new-privileges:true
+    # Allow writing to data directory
+    tmpfs:
+      - /tmp
